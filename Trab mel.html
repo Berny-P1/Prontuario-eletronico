@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Senaquinho - PEP Pediátrico SADC</title>
+    <style>
+        :root { 
+            --primary: #2c3e50; --secondary: #34495e; --accent: #3498db; 
+            --success: #27ae60; --danger: #e74c3c; --warning: #f1c40f; --light: #f5f6fa; 
+        }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: #dcdde1; overflow: hidden; }
+        
+        /* Sidebar */
+        .sidebar { width: 280px; background: var(--primary); color: white; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 15px; background: #1a252f; text-align: center; font-size: 0.9em; border-bottom: 2px solid var(--accent); }
+        .patient-list { flex: 1; overflow-y: auto; }
+        .patient-card { padding: 12px; border-bottom: 1px solid #3e4f5f; cursor: pointer; transition: 0.3s; }
+        .patient-card:hover { background: var(--secondary); }
+        .patient-card.active { background: var(--accent); border-left: 6px solid #fff; }
+
+        /* Main Content */
+        .main { flex: 1; display: flex; flex-direction: column; background: #fff; overflow: hidden; }
+        .header-hospital { padding: 10px 25px; background: #fff; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .h-title { color: var(--primary); margin: 0; font-size: 1.4em; text-transform: uppercase; letter-spacing: 1px; }
+        
+        /* Patient Strip */
+        .patient-strip { padding: 10px 25px; background: var(--light); display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; }
+        .allergy-alert { background: var(--danger); color: white; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 0.8em; animation: flash 1.5s infinite; }
+        @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        /* Tabs */
+        .nav-tabs { display: flex; background: #eee; border-bottom: 1px solid #ccc; overflow-x: auto; }
+        .tab { padding: 12px 15px; cursor: pointer; font-size: 0.75em; font-weight: bold; color: #555; border-right: 1px solid #ccc; white-space: nowrap; }
+        .tab.active { background: #fff; color: var(--accent); border-top: 3px solid var(--accent); margin-bottom: -1px; }
+
+        /* Sections */
+        .content { flex: 1; overflow-y: auto; padding: 20px; }
+        .section { display: none; }
+        .section.active { display: block; }
+        
+        .card { background: white; border: 1px solid #ddd; border-radius: 6px; padding: 15px; margin-bottom: 15px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+        .label { font-weight: bold; color: #777; font-size: 0.75em; text-transform: uppercase; display: block; }
+        .value { display: block; padding: 6px; background: #fcfcfc; border: 1px solid #eee; border-radius: 4px; margin-top: 4px; }
+
+        /* Prescrição Ajustada */
+        .form-presc { display: grid; grid-template-columns: 2fr 0.8fr 0.8fr 1fr 1fr auto; gap: 8px; align-items: end; }
+        select, input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; width: 100%; box-sizing: border-box; }
+        .btn { padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-add { background: var(--success); color: white; }
+        .btn-check { background: var(--warning); color: #000; font-size: 0.8em; }
+
+        /* Modais */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal { background: white; width: 450px; border-radius: 8px; overflow: hidden; }
+        .modal-header { padding: 15px; background: var(--primary); color: white; text-align: center; font-weight: bold; }
+        .step { padding: 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .step.ok { background: #d4edda; }
+        .dot { width: 12px; height: 12px; border-radius: 50%; background: #ccc; }
+        .dot.active { background: var(--success); }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">HOSPITAL SENAQUINHO<br><small>Unidade de Internação Pediátrica</small></div>
+        <div class="patient-list" id="sidebar-list"></div>
+    </div>
+
+    <div class="main">
+        <div class="header-hospital">
+            <h1 class="h-title">PEP Pediátrico</h1>
+            <div id="v-alerta"></div>
+        </div>
+
+        <div class="patient-strip">
+            <div><strong id="v-nome"></strong> | <span id="v-idade"></span></div>
+            <div>Quarto: <span id="v-quarto"></span> | Leito: <span id="v-leito"></span> | Peso: <strong id="v-peso"></strong>kg</div>
+        </div>
+
+        <div class="nav-tabs">
+            <div class="tab active" onclick="showTab('id', this)">IDENTIFICAÇÃO</div>
+            <div class="tab" onclick="showTab('hist', this)">HISTÓRICO</div>
+            <div class="tab" onclick="showTab('fis', this)">EXAME FÍSICO</div>
+            <div class="tab" onclick="showTab('vac', this)">VACINAÇÃO</div>
+            <div class="tab" onclick="showTab('presc', this)">PRESCRIÇÃO (SADC)</div>
+            <div class="tab" onclick="showTab('admin', this)">ADMINISTRAÇÃO (MAR)</div>
+            <div class="tab" onclick="showTab('diag', this)">DIAGNÓSTICO/ENF</div>
+        </div>
+
+        <div class="content">
+            <div id="sec-id" class="section active">
+                <div class="card">
+                    <h3>Dados do Paciente</h3>
+                    <div class="grid" id="grid-id"></div>
+                </div>
+                <div class="card"><h3>Responsáveis</h3><div class="grid" id="grid-resp"></div></div>
+            </div>
+
+            <div id="sec-hist" class="section">
+                <div class="card"><h3>Anamnese</h3><p class="label">Queixa:</p><div class="value" id="v-queixa"></div><p class="label">Antecedentes:</p><div class="value" id="v-hist"></div></div>
+            </div>
+
+            <div id="sec-fis" class="section">
+                <div class="card"><h3>Sinais Vitais</h3><div class="grid" id="grid-fis"></div></div>
+            </div>
+
+            <div id="sec-vac" class="section"><div class="card"><h3>Calendário Vacinal</h3><ul id="v-vacinas"></ul></div></div>
+
+            <div id="sec-presc" class="section">
+                <div class="card" style="border-left: 8px solid var(--accent);">
+                    <h3>Nova Prescrição</h3>
+                    <div id="info-sadc" style="margin-bottom:10px; color:var(--accent); font-size:0.8em; font-weight:bold;"></div>
+                    <div class="form-presc">
+                        <div><label class="label">Medicação</label>
+                            <select id="p-med" onchange="updateSADCInfo()">
+                                <option value="">Selecione...</option>
+                                <option value="amox">Amoxicilina (250mg/5mL)</option>
+                                <option value="ceft">Ceftriaxona (EV)</option>
+                                <option value="oxac">Oxacilina (EV)</option>
+                                <option value="dipi">Dipirona Sódica (Gts)</option>
+                                <option value="exp">SF 0,9% (Expansão)</option>
+                            </select>
+                        </div>
+                        <div><label class="label">Qtd.</label><input type="number" id="p-dose"></div>
+                        <div><label class="label">Unidade</label>
+                            <select id="p-uni">
+                                <option value="mg">mg</option>
+                                <option value="gts">gts</option>
+                                <option value="ml">ml</option>
+                                <option value="UI">UI</option>
+                            </select>
+                        </div>
+                        <div><label class="label">Via</label>
+                            <select id="p-via">
+                                <option value="VO">VO</option><option value="EV">EV</option><option value="IM">IM</option>
+                            </select>
+                        </div>
+                        <div><label class="label">Horário</label><input type="text" id="p-hora" placeholder="Ex: 8/8h"></div>
+                        <button class="btn btn-add" onclick="validarESalvar()">ADICIONAR</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Ordens Ativas</h3>
+                    <table width="100%" id="t-presc">
+                        <thead><tr align="left"><th>Medicação</th><th>Dose</th><th>Unidade</th><th>Via</th><th>Horário</th><th>Status</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="sec-admin" class="section">
+                <div class="card"><h3>💉 Checagem Beira-Leito</h3>
+                    <table width="100%" id="t-admin">
+                        <thead><tr align="left"><th>Medicação</th><th>Dose Completa</th><th>Horário</th><th>Ação</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="sec-diag" class="section">
+                <div class="card"><h3>Diagnóstico</h3><div id="v-diag" class="value"></div></div>
+                <div class="card"><h3>Enfermagem</h3><div id="v-enf" class="value"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="modal-check">
+        <div class="modal">
+            <div class="modal-header">TRIPLE CHECK: CONFERÊNCIA</div>
+            <div class="step" id="step1"><span>1. Pulseira Paciente</span><div class="dot"></div></div>
+            <div class="step" id="step2"><span>2. Código Medicamento</span><div class="dot"></div></div>
+            <div class="step" id="step3"><span>3. Crachá Profissional</span><div class="dot"></div></div>
+            <div style="padding:15px; display:flex; gap:10px;">
+                <button class="btn" style="flex:1; background:#ddd;" onclick="fecharCheck()">CANCELAR</button>
+                <button class="btn" id="btn-finalizar" style="flex:1; background:#ccc;" disabled onclick="confirmarAdmin()">CONFIRMAR</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay" id="modal-sadc">
+        <div class="modal" style="border: 5px solid var(--danger);">
+            <div class="modal-header" style="background:var(--danger)">🛑 ALERTA SADC - SEGURANÇA</div>
+            <div style="padding:20px; text-align:center;">
+                <h3 id="sadc-msg" style="color:var(--danger)"></h3>
+                <p>O sistema bloqueou esta ação para prevenir um erro de medicação.</p>
+                <button class="btn" style="background:var(--primary); color:white; width:100%" onclick="fecharSADC()">CORRIGIR</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const pacientes = [
+            { id: 1, nome: "Enzo Gabriel Ferreira", idade: "3 anos", peso: 14.5, quarto: "201", leito: "A", alergia: "Penicilina", mae: "Cláudia Lima", pai: "Roberto Ferreira", queixa: "Febre", hist: "Asma", sinais: "PA: 90/60", alt: "95cm", vac: ["Penta - OK"], diag: "Pneumonia", enf: "Acesso em MSD.", meds: [] },
+            { id: 2, nome: "Sophia Valentina Souza", idade: "2 anos", peso: 11.2, quarto: "201", leito: "B", alergia: "Dipirona", mae: "Bruna", pai: "Marcos", queixa: "Vômito", hist: "Nega", sinais: "PA: 85/50", alt: "86cm", vac: ["VIP - OK"], diag: "Gastro", enf: "Hidratando.", meds: [] },
+            { id: 3, nome: "Miguel Arcanjo", idade: "5 anos", peso: 19.0, quarto: "202", leito: "A", alergia: "Negativo", mae: "Maria", pai: "José", queixa: "Dor", hist: "Nega", sinais: "PA: 100/60", alt: "110cm", vac: ["DTP - OK"], diag: "Apendicite", enf: "Jejum.", meds: [] },
+            { id: 4, nome: "Ana Beatriz Costa", idade: "4 anos", peso: 16.5, quarto: "202", leito: "B", alergia: "Ovo", mae: "Aline", pai: "Paulo", queixa: "Tosse", hist: "Bronquiolite", sinais: "PA: 95/65", alt: "102cm", vac: ["Gripe - OK"], diag: "Asma", enf: "Nebulização.", meds: [] },
+            { id: 5, nome: "Arthur Henrique", idade: "3 anos", peso: 15.0, quarto: "203", leito: "A", alergia: "Lactose", mae: "Fernanda", pai: "Luís", queixa: "Manchas", hist: "Alergia", sinais: "PA: 90/60", alt: "98cm", vac: ["Tríplice - OK"], diag: "Virose", enf: "Ativo.", meds: [] }
+        ];
+
+        const regrasSADC = {
+            amox: { nome: "Amoxicilina", max: 50, unit: "mg/kg", alergia: "Penicilina" },
+            ceft: { nome: "Ceftriaxona", max: 100, unit: "mg/kg", alergia: "Penicilina" },
+            oxac: { nome: "Oxacilina", max: 200, unit: "mg/kg", alergia: "Penicilina" },
+            dipi: { nome: "Dipirona", max: 0.8, unit: "gts/kg", alergia: "Dipirona" },
+            exp: { nome: "SF 0,9% (Expansão)", max: 20, unit: "mL/kg", alergia: "nenhum" }
+        };
+
+        let pAtual = pacientes[0];
+        let medIndex = -1;
+
+        function init() {
+            const list = document.getElementById('sidebar-list');
+            pacientes.forEach(p => {
+                const div = document.createElement('div');
+                div.className = `patient-card ${p.id === 1 ? 'active' : ''}`;
+                div.id = `pc-${p.id}`;
+                div.onclick = () => carregar(p.id);
+                div.innerHTML = `<strong>${p.nome}</strong><br><small>Q:${p.quarto} L:${p.leito}</small>`;
+                list.appendChild(div);
+            });
+            carregar(1);
+        }
+
+        function carregar(id) {
+            pAtual = pacientes.find(x => x.id === id);
+            document.querySelectorAll('.patient-card').forEach(c => c.classList.remove('active'));
+            document.getElementById(`pc-${id}`).classList.add('active');
+            
+            document.getElementById('v-nome').innerText = pAtual.nome;
+            document.getElementById('v-idade').innerText = pAtual.idade;
+            document.getElementById('v-quarto').innerText = pAtual.quarto;
+            document.getElementById('v-leito').innerText = pAtual.leito;
+            document.getElementById('v-peso').innerText = pAtual.peso;
+            document.getElementById('v-alerta').innerHTML = pAtual.alergia !== "Negativo" ? `<div class="allergy-alert">ALERGIA: ${pAtual.alergia.toUpperCase()}</div>` : "";
+            
+            document.getElementById('grid-id').innerHTML = `<div><span class="label">Peso Admissão</span><span class="value">${pAtual.peso}kg</span></div><div><span class="label">Alergia</span><span class="value">${pAtual.alergia}</span></div>`;
+            document.getElementById('grid-resp').innerHTML = `<div><span class="label">Mãe</span><span class="value">${pAtual.mae}</span></div><div><span class="label">Pai</span><span class="value">${pAtual.pai}</span></div>`;
+            document.getElementById('v-queixa').innerText = pAtual.queixa;
+            document.getElementById('v-hist').innerText = pAtual.hist;
+            document.getElementById('grid-fis').innerHTML = `<div><span class="label">Sinais Vitais</span><span class="value">${pAtual.sinais}</span></div><div><span class="label">Altura</span><span class="value">${pAtual.alt}</span></div>`;
+            document.getElementById('v-vacinas').innerHTML = pAtual.vac.map(v => `<li>${v}</li>`).join('');
+            document.getElementById('v-diag').innerText = pAtual.diag;
+            document.getElementById('v-enf').innerText = pAtual.enf;
+
+            atualizarTabelas();
+            showTab('id', document.querySelector('.tab'));
+        }
+
+        function showTab(sec, el) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById('sec-'+sec).classList.add('active');
+            el.classList.add('active');
+        }
+
+        function updateSADCInfo() {
+            const medKey = document.getElementById('p-med').value;
+            const info = document.getElementById('info-sadc');
+            if (regrasSADC[medKey]) {
+                const r = regrasSADC[medKey];
+                const limite = (r.max * pAtual.peso).toFixed(1);
+                info.innerText = `SADC: Limite de segurança para este paciente: ${limite} ${r.unit.split('/')[0]}`;
+            } else { info.innerText = ""; }
+        }
+
+        function validarESalvar() {
+            const medKey = document.getElementById('p-med').value;
+            const doseQtd = parseFloat(document.getElementById('p-dose').value);
+            const doseUni = document.getElementById('p-uni').value;
+            const via = document.getElementById('p-via').value;
+            const hora = document.getElementById('p-hora').value;
+
+            if(!medKey || isNaN(doseQtd)) return alert("Preencha medicação e quantidade.");
+
+            const r = regrasSADC[medKey];
+
+            // BARREIRA 1: ALERGIA
+            if (pAtual.alergia !== "Negativo" && r.alergia !== "nenhum" && pAtual.alergia.toLowerCase().includes(r.alergia.toLowerCase().substring(0,4))) {
+                document.getElementById('sadc-msg').innerText = `BLOQUEIO: Paciente alérgico a ${pAtual.alergia}!`;
+                document.getElementById('modal-sadc').style.display = 'flex';
+                return;
+            }
+
+            // BARREIRA 2: DOSE (SADC)
+            const limite = r.max * pAtual.peso;
+            if (doseQtd > limite) {
+                document.getElementById('sadc-msg').innerText = `ALERTA DE DOSE: A dose de ${doseQtd}${doseUni} excede o limite seguro de ${limite.toFixed(1)}${r.unit.split('/')[0]} para este peso.`;
+                document.getElementById('modal-sadc').style.display = 'flex';
+                return;
+            }
+
+            pAtual.meds.push({ 
+                med: r.nome, 
+                quantidade: doseQtd, 
+                unidade: doseUni, 
+                via: via, 
+                hora: hora, 
+                status: 'Aguardando' 
+            });
+            
+            atualizarTabelas();
+            alert("Prescrição salva com sucesso.");
+            // Limpar campos
+            document.getElementById('p-dose').value = '';
+            document.getElementById('p-hora').value = '';
+        }
+
+        function atualizarTabelas() {
+            const bPresc = document.querySelector('#t-presc tbody');
+            const bAdmin = document.querySelector('#t-admin tbody');
+            bPresc.innerHTML = ""; bAdmin.innerHTML = "";
+            
+            pAtual.meds.forEach((m, i) => {
+                bPresc.innerHTML += `<tr>
+                    <td>${m.med}</td>
+                    <td>${m.quantidade}</td>
+                    <td>${m.unidade}</td>
+                    <td>${m.via}</td>
+                    <td>${m.hora}</td>
+                    <td>${m.status}</td>
+                </tr>`;
+                
+                if(m.status === 'Aguardando') {
+                    bAdmin.innerHTML += `<tr>
+                        <td>${m.med}</td>
+                        <td>${m.quantidade} ${m.unidade} / ${m.via}</td>
+                        <td>${m.hora}</td>
+                        <td><button class="btn btn-check" onclick="abrirCheck(${i})">BIPAR</button></td>
+                    </tr>`;
+                }
+            });
+        }
+
+        function abrirCheck(i) {
+            medIndex = i;
+            document.getElementById('modal-check').style.display = 'flex';
+            document.querySelectorAll('.step').forEach(s => s.className = 'step');
+            document.querySelectorAll('.dot').forEach(d => d.className = 'dot');
+            document.getElementById('btn-finalizar').disabled = true;
+            document.getElementById('btn-finalizar').style.background = '#ccc';
+            setTimeout(() => bipar(1), 800);
+            setTimeout(() => bipar(2), 1600);
+            setTimeout(() => bipar(3), 2400);
+        }
+
+        function bipar(s) {
+            const el = document.getElementById('step'+s);
+            if(el) {
+                el.className = 'step ok'; 
+                el.querySelector('.dot').className = 'dot active';
+                if(s === 3) { 
+                    const btn = document.getElementById('btn-finalizar');
+                    btn.disabled = false; 
+                    btn.style.background = 'var(--success)'; 
+                }
+            }
+        }
+
+        function confirmarAdmin() {
+            pAtual.meds[medIndex].status = "Administrado às " + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+            fecharCheck(); atualizarTabelas();
+        }
+
+        function fecharCheck() { document.getElementById('modal-check').style.display = 'none'; }
+        function fecharSADC() { document.getElementById('modal-sadc').style.display = 'none'; }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
