@@ -44,8 +44,8 @@
         .label { font-weight: bold; color: #777; font-size: 0.75em; text-transform: uppercase; display: block; }
         .value { display: block; padding: 6px; background: #fcfcfc; border: 1px solid #eee; border-radius: 4px; margin-top: 4px; }
 
-        /* Prescrição Ajustada */
-        .form-presc { display: grid; grid-template-columns: 2fr 0.8fr 0.8fr 1fr 1fr auto; gap: 8px; align-items: end; }
+        /* Prescrição */
+        .form-presc { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 8px; align-items: end; }
         select, input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em; width: 100%; box-sizing: border-box; }
         .btn { padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-add { background: var(--success); color: white; }
@@ -116,22 +116,24 @@
                         <div><label class="label">Medicação</label>
                             <select id="p-med" onchange="updateSADCInfo()">
                                 <option value="">Selecione...</option>
-                                <option value="amox">Amoxicilina (250mg/5mL)</option>
-                                <option value="ceft">Ceftriaxona (EV)</option>
-                                <option value="oxac">Oxacilina (EV)</option>
-                                <option value="dipi">Dipirona Sódica (Gts)</option>
-                                <option value="exp">SF 0,9% (Expansão)</option>
+                                <optgroup label="Antimicrobianos">
+                                    <option value="amox">Amoxicilina (50mg/kg)</option>
+                                    <option value="ceft">Ceftriaxona (100mg/kg)</option>
+                                    <option value="peni">Penicilina Cristalina (200k UI/kg)</option>
+                                </optgroup>
+                                <optgroup label="Sintomáticos">
+                                    <option value="dipi">Dipirona (0.8 gts/kg)</option>
+                                    <option value="para">Paracetamol (1 gt/kg)</option>
+                                    <option value="ibup">Ibuprofeno (10mg/kg)</option>
+                                </optgroup>
+                                <optgroup label="Emergência/Outros">
+                                    <option value="diaz">Diazepam (0.3mg/kg)</option>
+                                    <option value="furo">Furosemida (2mg/kg)</option>
+                                    <option value="exp">SF 0,9% (Expansão - 20ml/kg)</option>
+                                </optgroup>
                             </select>
                         </div>
-                        <div><label class="label">Qtd.</label><input type="number" id="p-dose"></div>
-                        <div><label class="label">Unidade</label>
-                            <select id="p-uni">
-                                <option value="mg">mg</option>
-                                <option value="gts">gts</option>
-                                <option value="ml">ml</option>
-                                <option value="UI">UI</option>
-                            </select>
-                        </div>
+                        <div><label class="label">Dose (valor)</label><input type="number" id="p-dose"></div>
                         <div><label class="label">Via</label>
                             <select id="p-via">
                                 <option value="VO">VO</option><option value="EV">EV</option><option value="IM">IM</option>
@@ -144,7 +146,7 @@
                 <div class="card">
                     <h3>Ordens Ativas</h3>
                     <table width="100%" id="t-presc">
-                        <thead><tr align="left"><th>Medicação</th><th>Dose</th><th>Unidade</th><th>Via</th><th>Horário</th><th>Status</th></tr></thead>
+                        <thead><tr align="left"><th>Medicação</th><th>Dose</th><th>Via</th><th>Horário</th><th>Status</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -153,7 +155,7 @@
             <div id="sec-admin" class="section">
                 <div class="card"><h3>💉 Checagem Beira-Leito</h3>
                     <table width="100%" id="t-admin">
-                        <thead><tr align="left"><th>Medicação</th><th>Dose Completa</th><th>Horário</th><th>Ação</th></tr></thead>
+                        <thead><tr align="left"><th>Medicação</th><th>Dose/Via</th><th>Horário</th><th>Ação</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -184,8 +186,8 @@
             <div class="modal-header" style="background:var(--danger)">🛑 ALERTA SADC - SEGURANÇA</div>
             <div style="padding:20px; text-align:center;">
                 <h3 id="sadc-msg" style="color:var(--danger)"></h3>
-                <p>O sistema bloqueou esta ação para prevenir um erro de medicação.</p>
-                <button class="btn" style="background:var(--primary); color:white; width:100%" onclick="fecharSADC()">CORRIGIR</button>
+                <p>O sistema bloqueou esta ação para prevenir um erro de medicação crítico.</p>
+                <button class="btn" style="background:var(--primary); color:white; width:100%" onclick="fecharSADC()">REVISAR PRESCRIÇÃO</button>
             </div>
         </div>
     </div>
@@ -200,11 +202,15 @@
         ];
 
         const regrasSADC = {
-            amox: { nome: "Amoxicilina", max: 50, unit: "mg/kg", alergia: "Penicilina" },
-            ceft: { nome: "Ceftriaxona", max: 100, unit: "mg/kg", alergia: "Penicilina" },
-            oxac: { nome: "Oxacilina", max: 200, unit: "mg/kg", alergia: "Penicilina" },
-            dipi: { nome: "Dipirona", max: 0.8, unit: "gts/kg", alergia: "Dipirona" },
-            exp: { nome: "SF 0,9% (Expansão)", max: 20, unit: "mL/kg", alergia: "nenhum" }
+            amox: { nome: "Amoxicilina", max: 50, unit: "mg/kg", alergia: "Penicilina", via: "VO" },
+            ceft: { nome: "Ceftriaxona", max: 100, unit: "mg/kg", alergia: "Penicilina", via: "EV" },
+            peni: { nome: "Penicilina Cristalina", max: 200000, unit: "UI/kg", alergia: "Penicilina", via: "EV" },
+            dipi: { nome: "Dipirona", max: 0.8, unit: "gts/kg", alergia: "Dipirona", via: "VO" },
+            para: { nome: "Paracetamol", max: 1, unit: "gts/kg", alergia: "Paracetamol", via: "VO" },
+            ibup: { nome: "Ibuprofeno", max: 10, unit: "mg/kg", alergia: "Ibuprofeno", via: "VO" },
+            diaz: { nome: "Diazepam", max: 0.3, unit: "mg/kg", alergia: "Diazepam", via: "EV" },
+            furo: { nome: "Furosemida", max: 2, unit: "mg/kg", alergia: "nenhum", via: "EV" },
+            exp: { nome: "SF 0,9% (Expansão)", max: 20, unit: "mL/kg", alergia: "nenhum", via: "EV" }
         };
 
         let pAtual = pacientes[0];
@@ -261,74 +267,55 @@
             if (regrasSADC[medKey]) {
                 const r = regrasSADC[medKey];
                 const limite = (r.max * pAtual.peso).toFixed(1);
-                info.innerText = `SADC: Limite de segurança para este paciente: ${limite} ${r.unit.split('/')[0]}`;
+                info.innerText = `PROTOCOLO HGWA: Dose máxima recomendada: ${limite} ${r.unit.split('/')[0]} (Via: ${r.via})`;
             } else { info.innerText = ""; }
         }
 
         function validarESalvar() {
             const medKey = document.getElementById('p-med').value;
-            const doseQtd = parseFloat(document.getElementById('p-dose').value);
-            const doseUni = document.getElementById('p-uni').value;
+            const dose = parseFloat(document.getElementById('p-dose').value);
             const via = document.getElementById('p-via').value;
             const hora = document.getElementById('p-hora').value;
 
-            if(!medKey || isNaN(doseQtd)) return alert("Preencha medicação e quantidade.");
+            if(!medKey || isNaN(dose)) return alert("Erro: Selecione a medicação e a dose.");
 
             const r = regrasSADC[medKey];
 
             // BARREIRA 1: ALERGIA
             if (pAtual.alergia !== "Negativo" && r.alergia !== "nenhum" && pAtual.alergia.toLowerCase().includes(r.alergia.toLowerCase().substring(0,4))) {
-                document.getElementById('sadc-msg').innerText = `BLOQUEIO: Paciente alérgico a ${pAtual.alergia}!`;
+                document.getElementById('sadc-msg').innerText = `BLOQUEIO DE SEGURANÇA: Paciente alérgico a ${pAtual.alergia}!`;
                 document.getElementById('modal-sadc').style.display = 'flex';
                 return;
             }
 
-            // BARREIRA 2: DOSE (SADC)
+            // BARREIRA 2: VIA DE ADMINISTRAÇÃO
+            if (via !== r.via) {
+                document.getElementById('sadc-msg').innerText = `ERRO DE VIA: ${r.nome} só pode ser administrado via ${r.via} conforme protocolo.`;
+                document.getElementById('modal-sadc').style.display = 'flex';
+                return;
+            }
+
+            // BARREIRA 3: DOSE (SADC)
             const limite = r.max * pAtual.peso;
-            if (doseQtd > limite) {
-                document.getElementById('sadc-msg').innerText = `ALERTA DE DOSE: A dose de ${doseQtd}${doseUni} excede o limite seguro de ${limite.toFixed(1)}${r.unit.split('/')[0]} para este peso.`;
+            if (dose > limite) {
+                document.getElementById('sadc-msg').innerText = `ALERTA DE DOSE: A dose de ${dose} excede o limite seguro de ${limite.toFixed(1)} ${r.unit.split('/')[0]} para este peso (${pAtual.peso}kg).`;
                 document.getElementById('modal-sadc').style.display = 'flex';
                 return;
             }
 
-            pAtual.meds.push({ 
-                med: r.nome, 
-                quantidade: doseQtd, 
-                unidade: doseUni, 
-                via: via, 
-                hora: hora, 
-                status: 'Aguardando' 
-            });
-            
+            pAtual.meds.push({ med: r.nome, dose: dose + " " + r.unit.split('/')[0], via, hora, status: 'Aguardando' });
             atualizarTabelas();
-            alert("Prescrição salva com sucesso.");
-            // Limpar campos
-            document.getElementById('p-dose').value = '';
-            document.getElementById('p-hora').value = '';
+            alert("Prescrição validada e salva.");
         }
 
         function atualizarTabelas() {
             const bPresc = document.querySelector('#t-presc tbody');
             const bAdmin = document.querySelector('#t-admin tbody');
             bPresc.innerHTML = ""; bAdmin.innerHTML = "";
-            
             pAtual.meds.forEach((m, i) => {
-                bPresc.innerHTML += `<tr>
-                    <td>${m.med}</td>
-                    <td>${m.quantidade}</td>
-                    <td>${m.unidade}</td>
-                    <td>${m.via}</td>
-                    <td>${m.hora}</td>
-                    <td>${m.status}</td>
-                </tr>`;
-                
+                bPresc.innerHTML += `<tr><td>${m.med}</td><td>${m.dose}</td><td>${m.via}</td><td>${m.hora}</td><td>${m.status}</td></tr>`;
                 if(m.status === 'Aguardando') {
-                    bAdmin.innerHTML += `<tr>
-                        <td>${m.med}</td>
-                        <td>${m.quantidade} ${m.unidade} / ${m.via}</td>
-                        <td>${m.hora}</td>
-                        <td><button class="btn btn-check" onclick="abrirCheck(${i})">BIPAR</button></td>
-                    </tr>`;
+                    bAdmin.innerHTML += `<tr><td>${m.med}</td><td>${m.dose} / ${m.via}</td><td>${m.hora}</td><td><button class="btn btn-check" onclick="abrirCheck(${i})">BIPAR</button></td></tr>`;
                 }
             });
         }
@@ -340,6 +327,7 @@
             document.querySelectorAll('.dot').forEach(d => d.className = 'dot');
             document.getElementById('btn-finalizar').disabled = true;
             document.getElementById('btn-finalizar').style.background = '#ccc';
+
             setTimeout(() => bipar(1), 800);
             setTimeout(() => bipar(2), 1600);
             setTimeout(() => bipar(3), 2400);
@@ -347,14 +335,11 @@
 
         function bipar(s) {
             const el = document.getElementById('step'+s);
-            if(el) {
-                el.className = 'step ok'; 
-                el.querySelector('.dot').className = 'dot active';
-                if(s === 3) { 
-                    const btn = document.getElementById('btn-finalizar');
-                    btn.disabled = false; 
-                    btn.style.background = 'var(--success)'; 
-                }
+            el.className = 'step ok'; el.querySelector('.dot').className = 'dot active';
+            if(s === 3) { 
+                document.getElementById('btn-finalizar').disabled = false; 
+                document.getElementById('btn-finalizar').style.background = 'var(--success)'; 
+                document.getElementById('btn-finalizar').style.color = 'white'; 
             }
         }
 
